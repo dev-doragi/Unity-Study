@@ -2,12 +2,13 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Animations;
+
 public class Enemy : MonoBehaviour
 {
     public float maxSpeed;
     private bool movingjudge;
     float r = 0.0f;
-    int h = 0;
+    public int h = 0;
 
     Rigidbody2D rigid;
     Animator anim;
@@ -25,6 +26,7 @@ public class Enemy : MonoBehaviour
     {
         Moving();
     }
+
     void Moving()
     {
 
@@ -53,7 +55,7 @@ public class Enemy : MonoBehaviour
         {
             h *= -1;
             CancelInvoke(); // 실행되는 모든 Invoke를 취소하는 함수
-            Invoke("Onmovind", 5);
+            Invoke("Onmoving", 5);
         }
 
         if (h == 1)

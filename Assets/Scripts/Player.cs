@@ -4,13 +4,16 @@ using UnityEngine;
 
 public class Player : MonoBehaviour
 {
+    public ParticleSystem effect;
     public float max_speed;
     public float jump_power;
 
     bool isJump = false;
+    bool canMove = true;
 
-    float rayLength = 2.2f;
+    float rayLength = 3.2f;
 
+    Animator anim;
     Rigidbody2D rigid;
     SpriteRenderer spriteRenderer;
     Vector3 movevelocity = Vector3.zero;
@@ -19,44 +22,25 @@ public class Player : MonoBehaviour
     {
         rigid = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        anim = GetComponent<Animator>();
     }
 
     void Update()
     {
+        Vdown();
         Reverse();
         Jump();
+        Move();
     }
 
     private void FixedUpdate()
     {
-        Debug.Log(isJump);
-        // h에 "Horizontal" 즉 좌우 방향키로 1, -1을 받아옴
-        float h = Input.GetAxisRaw("Horizontal");
-
-        //변수에 x축으로 더해줄 속도를 입력해줌
-        movevelocity = new Vector3(max_speed, 0, 0);
-        //현재 나의 위치를 컴퓨터 사양에 맞는 프레임 단위로 계속 이동해준다.
-        transform.position += movevelocity * h * Time.deltaTime;
-
-        //만약 내 속도가 최고 속도를 넘는다면
-        if (rigid.velocity.x > max_speed)
-            //내 속도를 최고 속도로 고정한다.
-            rigid.velocity = new Vector2(max_speed, rigid.velocity.y);
-        else if (rigid.velocity.x < max_speed * (-1))
-            rigid.velocity = new Vector2(max_speed * (-1), rigid.velocity.y);
-
-        // 내가 움직이고 계속 움직이는 중이라면 변수를 0으로 바꾼다. == 내가 방향키에서 손을 땠지만 아직 속도가 있다면 그 속도를 0으로 바꾸겠다.
-        if (rigid.velocity.x != 0)
-        {
-            Vector3 moveVelocity = Vector3.zero;
-        }
-
-        //레이케스트
-        //아래쪽으로 레이져를 쏴서 아래에 "Platform"이라는 레이어의 물체가 있는지 판단
+        // 레이케스트
+        // 아래쪽으로 레이저를 쏴서 아래에 "Platform"이라는 레이어의 물체가 있는지 판단
         Debug.DrawRay(rigid.position, Vector3.down * rayLength, new Color(0, 1, 0));
         RaycastHit2D rayHit = Physics2D.Raycast(rigid.position, Vector3.down, rayLength, LayerMask.GetMask("Platform"));
-        //만약 "platform"이라는 레이어의 물체가 있으면 점프를 하고 있지 않다는 의미 == 내가 땅에 붙어있다.
-        if (rayHit.collider != null) // null을 부정하기 때문에 없지 않다. == 있다.
+        // 만약 "platform"이라는 레이어의 물체가 있으면 점프를 하고 있지 않다는 의미 == 내가 땅에 붙어있다.
+        if (rayHit.collider != null)
         {
             isJump = false;
         }
@@ -64,7 +48,6 @@ public class Player : MonoBehaviour
         {
             isJump = true;
         }
-
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -73,22 +56,74 @@ public class Player : MonoBehaviour
             onDamaged(collision.transform.position);
     }
 
+    void constraintMove()
+    {
+        canMove = !canMove;
+    }
+
     void onDamaged(Vector2 targetPos)
     {
+        anim.SetTrigger("isHit");
+        gameObject.layer = 6;
         spriteRenderer.color = new Color(1, 1, 1, 0.4f);
-
+        Invoke("constraintMove", 0.4f);
+        Invoke("constraintMove", 0.7f);
         int dirc = transform.position.x - targetPos.x > 0 ? 1 : -1;
-        rigid.AddForce(new Vector2(dirc, 1) * 3, ForceMode2D.Impulse);
 
-        Invoke("offDamaged", 3);
+        rigid.AddForce(new Vector2(dirc * 8f, 7f), ForceMode2D.Impulse);
+        isJump = false;
+
+        Invoke("offDamaged", 1f);
     }
 
     void offDamaged()
     {
+        gameObject.layer = 7;
         spriteRenderer.color = new Color(1, 1, 1, 1f);
     }
 
-    //점프 구현
+    void Move()
+    {
+        if (canMove)
+        {
+            // h에 "Horizontal" 즉 좌우 방향키로 1, -1을 받아옴
+            float h = Input.GetAxisRaw("Horizontal");
+
+            // 힘을 가할 방향과 크기를 설정
+            Vector3 force = new Vector3(h * max_speed, 0, 0);
+
+            // Rigidbody에 힘을 가해 이동시킴
+            rigid.AddForce(force);
+
+            // 만약 내 속도가 최고 속도를 넘는다면
+            if (rigid.velocity.x > max_speed)
+            {
+                // 내 속도를 최고 속도로 고정한다.
+                rigid.velocity = new Vector2(max_speed, rigid.velocity.y);
+            }
+            else if (rigid.velocity.x < max_speed * (-1))
+            {
+                // 내 속도를 최고 속도로 고정한다.
+                rigid.velocity = new Vector2(max_speed * (-1), rigid.velocity.y);
+            }
+
+            // 애니메이션 설정을 이동 처리 내에서 업데이트
+            if (Mathf.Abs(rigid.velocity.x) > 0.1f)
+                anim.SetBool("isWalking", true);
+            else
+                anim.SetBool("isWalking", false);
+        }
+    }
+
+    void Vdown()
+    {
+        if (Input.GetButtonUp("Horizontal"))
+        {
+            rigid.velocity = new Vector2(rigid.velocity.normalized.x * 0.1f, rigid.velocity.y);
+        }
+    }
+
+    // 점프 구현
     void Jump()
     {
         if (Input.GetButtonDown("Jump") && !isJump)
@@ -99,16 +134,17 @@ public class Player : MonoBehaviour
         }
     }
 
-
-    //고개 돌리기
+    // 고개 돌리기
     void Reverse()
     {
         float h = Input.GetAxisRaw("Horizontal");
 
         if (Input.GetButton("Horizontal"))
+        {
             if (h == 1)
                 spriteRenderer.flipX = false;
             else if (h == -1)
                 spriteRenderer.flipX = true;
+        }
     }
 }
